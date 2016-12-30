@@ -15,19 +15,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include<fileutils.hpp>
-#include<cstdio>
+#pragma once
 
-int main(int argc, char **argv) {
-    if(argc != 2) {
-        printf("Fail.\n");
-        return 1;
-    }
-    std::vector<std::string> originals;
-    originals.push_back(argv[1]);
-    auto entries = expand_files(originals);
-    for(const auto &i : entries) {
-        printf("%s\n", i.fname.c_str());
-    }
-    return 0;
-}
+void throw_system(const char *msg);
