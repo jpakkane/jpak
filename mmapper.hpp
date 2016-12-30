@@ -15,22 +15,33 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include<fileutils.hpp>
-#include<jpacker.hpp>
-#include<cstdio>
+#pragma once
 
-int main(int argc, char **argv) {
-    if(argc != 3) {
-        printf("%s [jpack file] [dir to package].\n", argv[0]);
-        return 1;
-    }
-    std::vector<std::string> originals;
-    originals.push_back(argv[2]);
-    auto entries = expand_files(originals);
-    /*
-    for(const auto &i : entries) {
-        printf("%s\n", i.fname.c_str());
-    }*/
-    jpack(argv[1], entries);
-    return 0;
-}
+#ifdef _WIN32
+#include<winsock2.h>
+#include<windows.h>
+#endif
+#include<cstdint>
+
+class File;
+
+class MMapper final {
+public:
+    explicit MMapper(const File &file);
+    MMapper(const MMapper&) = delete;
+    MMapper(MMapper && other);
+    MMapper& operator=(const MMapper &) = delete;
+    MMapper& operator=(MMapper &&other);
+    ~MMapper();
+
+    uint64_t size() const { return map_size; }
+
+    operator unsigned char*() { return reinterpret_cast<unsigned char*>(addr); }
+
+private:
+    void *addr;
+    uint64_t map_size;
+#if defined(_WIN32)
+    HANDLE h;
+#endif
+};

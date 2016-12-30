@@ -34,3 +34,6 @@ struct fileinfo {
 };
 
 std::vector<fileinfo> expand_files(const std::vector<std::string> &originals);
+
+bool is_dir(const fileinfo &f);
+bool is_file(const fileinfo &f);

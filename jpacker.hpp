@@ -15,22 +15,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include<fileutils.hpp>
-#include<jpacker.hpp>
-#include<cstdio>
+#pragma once
 
-int main(int argc, char **argv) {
-    if(argc != 3) {
-        printf("%s [jpack file] [dir to package].\n", argv[0]);
-        return 1;
-    }
-    std::vector<std::string> originals;
-    originals.push_back(argv[2]);
-    auto entries = expand_files(originals);
-    /*
-    for(const auto &i : entries) {
-        printf("%s\n", i.fname.c_str());
-    }*/
-    jpack(argv[1], entries);
-    return 0;
-}
+#include<fileutils.hpp>
+
+void jpack(const char *ofname, const std::vector<fileinfo> &entries);

@@ -36,14 +36,6 @@ namespace {
 
 std::vector<fileinfo> expand_entry(const std::string &fname);
 
-bool is_dir(const fileinfo &f) {
-    return S_ISDIR(f.mode);
-}
-
-bool is_file(const fileinfo &f) {
-    return S_ISREG(f.mode);
-}
-
 fileinfo get_unix_stats(const std::string &fname) {
     struct stat buf;
     fileinfo sd;
@@ -154,4 +146,12 @@ std::vector<fileinfo> expand_files(const std::vector<std::string> &originals) {
         std::move(n.begin(), n.end(), std::back_inserter(res));
         return res;
     });
+}
+
+bool is_dir(const fileinfo &f) {
+    return S_ISDIR(f.mode);
+}
+
+bool is_file(const fileinfo &f) {
+    return S_ISREG(f.mode);
 }
