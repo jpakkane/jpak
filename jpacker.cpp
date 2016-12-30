@@ -62,7 +62,10 @@ void jpack(const char *ofname, const std::vector<fileinfo> &entries) {
     for(const auto &e : entries) {
         ofile.write16le(e.fname.size());
     }
-    // Filenames have variable length.
+    for(const auto &o : entry_offsets) {
+        ofile.write64le(o);
+    }
+    // Filenames have variable length so they must be last.
     for(const auto &e : entries) {
         ofile.write(e.fname);
     }
