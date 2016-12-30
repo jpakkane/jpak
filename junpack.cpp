@@ -17,10 +17,12 @@
 
 #include<file.hpp>
 #include<fileutils.hpp>
-
+#include<mmapper.hpp>
+#include<fcntl.h>
+#include<sys/stat.h>
 #include<cstdio>
 
-void print_stats(const char *fname) {
+void unpack(const char *fname, std::string outdir) {
     File ifile(fname, "rb");
     std::vector<fileinfo> entries;
     std::vector<uint16_t> fname_sizes;
@@ -30,6 +32,13 @@ void print_stats(const char *fname) {
     if(magic != 12345678) {
         printf("Bad magic number, invalid archive.\n");
         return;
+    }
+    if(outdir.empty()) {
+        printf("Extraction dir must not be empty.\n");
+        return;
+    }
+    if(outdir.back() != '/') {
+        outdir.push_back('/');
     }
     auto num_entries = ifile.read64le();
     auto index_offset = ifile.read64le();
@@ -73,16 +82,32 @@ void print_stats(const char *fname) {
     for(uint64_t j=0; j<num_entries; j++) {
         entries[j].fname = ifile.read(fname_sizes[j]);
     }
+    /*
     for(const auto &e : entries) {
         printf("%s\n %d", e.fname.c_str());
+    }
+    */
+    auto mmap = ifile.mmap();
+    const unsigned char *start = mmap;
+    for(uint64_t j=0; j<num_entries; j++) {
+        auto &e = entries[j];
+        auto offset = entry_offsets[j];
+        auto ofname = outdir + e.fname;
+        if(is_dir(e)) {
+            mkdir(ofname.c_str(), S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
+        } else {
+            File f(ofname, "wb");
+            f.write(start + offset, e.uncompressed_size);
+        }
+        // FIXME restore metadata here.
     }
 }
 
 int main(int argc, char **argv) {
-    if(argc != 2) {
-        printf("%s <archive>\n", argv[0]);
+    if(argc != 3) {
+        printf("%s <archive> <outdir>\n", argv[0]);
         return 1;
     }
-    print_stats(argv[1]);
+    unpack(argv[1], argv[2]);
     return 0;
 }
