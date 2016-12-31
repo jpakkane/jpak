@@ -94,7 +94,7 @@ File compress_lzma(MMapper buf) {
         }
     }
 
-    fflush(f);
+    f.flush();
     return f;
 }
 
@@ -119,42 +119,47 @@ void jpack(const char *ofname, std::vector<fileinfo> &entries) {
     }
     assert(entry_offsets.size() == entries.size());
     uint64_t index_offset = ofile.tell();
+    File index(tmpfile());
     // Now dump metadata one column at a time for maximal compression.
     for(const auto &e : entries) {
-        ofile.write64le(e.uncompressed_size);
+        index.write64le(e.uncompressed_size);
     }
     for(const auto &e : entries) {
-        ofile.write64le(e.compressed_size);
+        index.write64le(e.compressed_size);
     }
     for(const auto &e : entries) {
-        ofile.write64le(e.mode);
+        index.write64le(e.mode);
     }
     for(const auto &e : entries) {
-        ofile.write32le(e.uid);
+        index.write32le(e.uid);
     }
     for(const auto &e : entries) {
-        ofile.write32le(e.gid);
+        index.write32le(e.gid);
     }
     for(const auto &e : entries) {
-        ofile.write32le(e.atime);
+        index.write32le(e.atime);
     }
     for(const auto &e : entries) {
-        ofile.write32le(e.mtime);
+        index.write32le(e.mtime);
     }
     for(const auto &e : entries) {
-        ofile.write16le(e.fname.size());
+        index.write16le(e.fname.size());
     }
     for(const auto &o : entry_offsets) {
-        ofile.write64le(o);
+        index.write64le(o);
     }
     // Filenames have variable length so they must be last.
     for(const auto &e : entries) {
-        ofile.write(e.fname);
+        index.write(e.fname);
     }
+    auto compressed_index = compress_lzma(index.mmap());
+//    printf("Index uncompressed: %d\n", (int)index.size());
+//    printf("Index compressed: %d\n", (int)compressed_index.tell());
+    ofile.append(compressed_index);
     // Now done. Write suffix.
     ofile.write32le(12345678);
     ofile.write64le(entries.size());
     ofile.write64le(index_offset);
-    // FIXME when compressing index, write also end of it.
+    ofile.write64le(compressed_index.size());
 }
 

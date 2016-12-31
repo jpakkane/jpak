@@ -28,13 +28,12 @@
 
 #include<memory>
 
-#define CHUNK (1024*1024)
-
 namespace {
 
 void lzma_to_file(const unsigned char *data_start,
                       uint64_t data_size,
                       FILE *ofile) {
+    const int CHUNK=1024*1024;
     std::unique_ptr<unsigned char[]> out(new unsigned char [CHUNK]);
     lzma_stream strm = LZMA_STREAM_INIT;
     lzma_filter filter[2];
@@ -87,7 +86,7 @@ void unpack(const char *fname, std::string outdir) {
     std::vector<fileinfo> entries;
     std::vector<uint16_t> fname_sizes;
     std::vector<uint64_t> entry_offsets;
-    ifile.seek(-20, SEEK_END);
+    ifile.seek(-28, SEEK_END);
     auto magic = ifile.read32le();
     if(magic != 12345678) {
         printf("Bad magic number, invalid archive.\n");
@@ -102,58 +101,63 @@ void unpack(const char *fname, std::string outdir) {
     }
     auto num_entries = ifile.read64le();
     auto index_offset = ifile.read64le();
-    printf("This file has %d entries.\n", (int)num_entries);
+    auto index_compressed_size = ifile.read64le();
     entries.reserve(num_entries);
     fname_sizes.reserve(num_entries);
     entry_offsets.reserve(num_entries);
-    ifile.seek(index_offset, SEEK_SET);
     for(uint64_t j=0; j<num_entries; j++) {
         fileinfo f;
         entries.push_back(f);
     }
+    printf("This file has %d entries.\n", (int)num_entries);
+    printf("Index size: %d\n", (int)index_compressed_size);
+
+    auto mmap = ifile.mmap();
+    File index(tmpfile());
+    lzma_to_file((unsigned char*)mmap + index_offset, index_compressed_size, index.get());
+    index.seek(0, SEEK_SET);
     for(auto &e : entries) {
-        e.uncompressed_size = ifile.read64le();
+        e.uncompressed_size = index.read64le();
     }
     for(auto &e : entries) {
-        e.compressed_size = ifile.read64le();
+        e.compressed_size = index.read64le();
     }
     for(auto &e : entries) {
-        e.mode = ifile.read64le();
+        e.mode = index.read64le();
     }
     for(auto &e : entries) {
-        e.uid = ifile.read32le();
+        e.uid = index.read32le();
     }
     for(auto &e : entries) {
-        e.gid = ifile.read32le();
+        e.gid = index.read32le();
     }
     for(auto &e : entries) {
-        e.atime = ifile.read32le();
+        e.atime = index.read32le();
     }
     for(auto &e : entries) {
-        e.mtime = ifile.read32le();
+        e.mtime = index.read32le();
     }
     for(uint64_t j=0; j<num_entries; j++) {
-        fname_sizes.push_back(ifile.read16le());
+        fname_sizes.push_back(index.read16le());
     }
     for(uint64_t j=0; j<num_entries; j++) {
-        entry_offsets.push_back(ifile.read64le());
+        entry_offsets.push_back(index.read64le());
     }
     // Filenames have variable length so they must be last.
     for(uint64_t j=0; j<num_entries; j++) {
-        entries[j].fname = ifile.read(fname_sizes[j]);
+        entries[j].fname = index.read(fname_sizes[j]);
     }
     /*
     for(const auto &e : entries) {
         printf("%s\n %d", e.fname.c_str());
     }
     */
-    auto mmap = ifile.mmap();
     const unsigned char *start = mmap;
     for(uint64_t j=0; j<num_entries; j++) {
         auto &e = entries[j];
         auto offset = entry_offsets[j];
         auto ofname = outdir + e.fname;
-        printf("%s %d\n", e.fname.c_str(), (int)e.compressed_size);
+        printf("%s\n", e.fname.c_str());
         if(is_dir(e)) {
             mkdir(ofname.c_str(), S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
         } else {

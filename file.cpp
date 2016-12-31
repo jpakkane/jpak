@@ -68,6 +68,7 @@ int File::fileno() const {
 }
 
 MMapper File::mmap() const {
+    flush();
     return MMapper(*this);
 }
 
@@ -135,7 +136,7 @@ uint64_t File::size() const {
     return buf.st_size;
 }
 
-void File::flush() {
+void File::flush() const {
     if(fflush(f) != 0) {
         throw_system("Flushing data failed:");
     }

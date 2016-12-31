@@ -49,7 +49,7 @@ public:
     MMapper mmap() const;
 
     uint64_t size() const;
-    void flush();
+    void flush() const;
     void close();
 
     uint8_t read8();
