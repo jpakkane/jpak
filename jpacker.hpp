@@ -19,4 +19,4 @@
 
 #include<fileutils.hpp>
 
-void jpack(const char *ofname, const std::vector<fileinfo> &entries);
+void jpack(const char *ofname, std::vector<fileinfo> &entries);

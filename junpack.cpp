@@ -18,9 +18,69 @@
 #include<file.hpp>
 #include<fileutils.hpp>
 #include<mmapper.hpp>
+#include<utils.hpp>
+
 #include<fcntl.h>
 #include<sys/stat.h>
 #include<cstdio>
+
+#include<lzma.h>
+
+#include<memory>
+
+#define CHUNK (1024*1024)
+
+namespace {
+
+void lzma_to_file(const unsigned char *data_start,
+                      uint64_t data_size,
+                      FILE *ofile) {
+    std::unique_ptr<unsigned char[]> out(new unsigned char [CHUNK]);
+    lzma_stream strm = LZMA_STREAM_INIT;
+    lzma_filter filter[2];
+    unsigned int have;
+
+    size_t offset = 2;
+    uint16_t properties_size = le16toh(*reinterpret_cast<const uint16_t*>(data_start + offset));
+    offset+=2;
+    filter[0].id = LZMA_FILTER_LZMA1;
+    filter[1].id = LZMA_VLI_UNKNOWN;
+    lzma_ret ret = lzma_properties_decode(&filter[0], nullptr, data_start + offset, properties_size);
+    offset += properties_size;
+    if(ret != LZMA_OK) {
+        throw std::runtime_error("Could not decode LZMA properties.");
+    }
+    ret = lzma_raw_decoder(&strm, &filter[0]);
+    free(filter[0].options);
+    if(ret != LZMA_OK) {
+        throw std::runtime_error("Could not initialize LZMA decoder.");
+    }
+    std::unique_ptr<lzma_stream, void(*)(lzma_stream*)> lcloser(&strm, lzma_end);
+
+    const unsigned char *current = data_start + offset;
+    strm.avail_in = (size_t)(data_size - offset);
+    strm.next_in = current;
+    /* decompress until data ends */
+    do {
+        if (strm.total_in == data_size - offset)
+            break;
+
+        do {
+            strm.avail_out = CHUNK;
+            strm.next_out = out.get();
+            ret = lzma_code(&strm, LZMA_RUN);
+            if(ret != LZMA_OK && ret != LZMA_STREAM_END) {
+                throw std::runtime_error("Decompression failed.");
+            }
+            have = CHUNK - strm.avail_out;
+            if (fwrite(out.get(), 1, have, ofile) != have || ferror(ofile)) {
+                throw_system("Could not write to file:");
+            }
+        } while (strm.avail_out == 0);
+    } while (true);
+}
+
+}
 
 void unpack(const char *fname, std::string outdir) {
     File ifile(fname, "rb");
@@ -93,11 +153,11 @@ void unpack(const char *fname, std::string outdir) {
         auto &e = entries[j];
         auto offset = entry_offsets[j];
         auto ofname = outdir + e.fname;
+        printf("%s %d\n", e.fname.c_str(), (int)e.compressed_size);
         if(is_dir(e)) {
             mkdir(ofname.c_str(), S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
         } else {
-            File f(ofname, "wb");
-            f.write(start + offset, e.uncompressed_size);
+            lzma_to_file(start + offset, e.compressed_size, File(ofname, "wb"));
         }
         // FIXME restore metadata here.
     }

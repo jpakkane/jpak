@@ -17,22 +17,104 @@
 
 #include<jpacker.hpp>
 #include<file.hpp>
+#include<mmapper.hpp>
+#include<utils.hpp>
 
+#include<lzma.h>
+
+#include<memory>
 #include<cstdio>
 #include<cassert>
 
-void jpack(const char *ofname, const std::vector<fileinfo> &entries) {
+namespace {
+
+File compress_lzma(MMapper buf) {
+    const int CHUNK=1024*1024;
+    FILE *tmpf = tmpfile();
+    std::unique_ptr<unsigned char[]> out(new unsigned char [CHUNK]);
+    uint32_t filter_size;
+    if(!tmpf) {
+        throw_system("Could not create temp file: ");
+    }
+    File f(tmpf);
+    lzma_options_lzma opt_lzma;
+    lzma_stream strm = LZMA_STREAM_INIT;
+    if(lzma_lzma_preset(&opt_lzma, LZMA_PRESET_DEFAULT)) {
+        throw std::runtime_error("Unsupported LZMA preset.");
+    }
+    lzma_filter filter[2];
+    filter[0].id = LZMA_FILTER_LZMA1;
+    filter[0].options = &opt_lzma;
+    filter[1].id = LZMA_VLI_UNKNOWN;
+
+    lzma_ret ret = lzma_raw_encoder(&strm, filter);
+    if(ret != LZMA_OK) {
+        throw std::runtime_error("Could not create LZMA encoder.");
+    }
+    if(lzma_properties_size(&filter_size, filter) != LZMA_OK) {
+        throw std::runtime_error("Could not determine LZMA properties size.");
+    } else {
+        std::string x(filter_size, 'X');
+        if(lzma_properties_encode(filter, (unsigned char*)x.data()) != LZMA_OK) {
+            throw std::runtime_error("Could not encode filter properties.");
+        }
+        f.write8(9); // This is what Python's lzma lib does. Copy it without understanding.
+        f.write8(4);
+        f.write16le(filter_size);
+        f.write(x);
+    }
+    std::unique_ptr<lzma_stream, void(*)(lzma_stream*)> lcloser(&strm, lzma_end);
+
+    strm.avail_in = buf.size();
+    strm.next_in = buf;
+    /* compress until data ends */
+    lzma_action action = LZMA_RUN;
+    while(true) {
+        if(strm.total_in >= buf.size()) {
+            action = LZMA_FINISH;
+        } else {
+            strm.avail_out = CHUNK;
+            strm.next_out = out.get();
+        }
+        ret = lzma_code(&strm, action);
+        if(strm.avail_out == 0 || ret == LZMA_STREAM_END) {
+            size_t write_size = CHUNK - strm.avail_out;
+            if (fwrite(out.get(), 1, write_size, f) != write_size || ferror(f)) {
+                throw_system("Could not write to file:");
+            }
+            strm.next_out = out.get();
+            strm.avail_out = CHUNK;
+        }
+
+        if(ret != LZMA_OK) {
+            if(ret == LZMA_STREAM_END) {
+                break;
+            }
+            throw std::runtime_error("Compression failed.");
+        }
+    }
+
+    fflush(f);
+    return f;
+}
+
+}
+
+
+void jpack(const char *ofname, std::vector<fileinfo> &entries) {
     File ofile(ofname, "wb");
     ofile.write("JPAK0", 4);
     std::vector<uint64_t> entry_offsets;
     entry_offsets.reserve(entries.size());
-    for(const auto &e : entries) {
+    for(auto &e : entries) {
         entry_offsets.push_back(ofile.tell());
         if(is_dir(e)) {
             continue;
         }
         File ifile(e.fname, "r");
-        ofile.append(ifile);
+        auto tmpfile = compress_lzma(ifile.mmap());
+        e.compressed_size = tmpfile.size();
+        ofile.append(tmpfile);
         // FIXME, store compressed size.
     }
     assert(entry_offsets.size() == entries.size());
