@@ -8,3 +8,4 @@ This is a compression format designed for:
  - random access of files
  - parallel packing and unpacking
 
+Note that parallel operations are not yet implemented.
