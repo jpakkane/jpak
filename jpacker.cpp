@@ -121,7 +121,7 @@ void jpack(const char *ofname, const std::vector<fileinfo> &entries) {
         }
         // Compress data if there is more of it than the specified clump size.
         if(stored_data >= block_size || !first_file_written) {
-            if(!first_file_written) {
+            if(first_file_written) {
                 auto tmpfile = compress_lzma(gather_file.mmap());
                 ofile.append(tmpfile);
                 gather_file.clear();
