@@ -79,6 +79,20 @@ void lzma_to_file(const unsigned char *data_start,
     } while (true);
 }
 
+
+uint64_t get_block_end(const std::vector<uint64_t> entry_offsets,
+        uint64_t j,
+        const uint64_t index_offset) {
+    ++j;
+    while(j < entry_offsets.size()) {
+        if(entry_offsets[j] != NO_OFFSET) {
+            return entry_offsets[j];
+        }
+        ++j;
+    }
+    return index_offset;
+}
+
 }
 
 void unpack(const char *fname, std::string outdir) {
@@ -110,7 +124,7 @@ void unpack(const char *fname, std::string outdir) {
         entries.push_back(f);
     }
     printf("This file has %d entries.\n", (int)num_entries);
-    printf("Index size: %d\n", (int)index_compressed_size);
+//    printf("Index size: %d\n", (int)index_compressed_size);
 
     auto mmap = ifile.mmap();
     File index(tmpfile());
@@ -118,9 +132,6 @@ void unpack(const char *fname, std::string outdir) {
     index.seek(0, SEEK_SET);
     for(auto &e : entries) {
         e.uncompressed_size = index.read64le();
-    }
-    for(auto &e : entries) {
-        e.compressed_size = index.read64le();
     }
     for(auto &e : entries) {
         e.mode = index.read64le();
@@ -147,12 +158,8 @@ void unpack(const char *fname, std::string outdir) {
     for(uint64_t j=0; j<num_entries; j++) {
         entries[j].fname = index.read(fname_sizes[j]);
     }
-    /*
-    for(const auto &e : entries) {
-        printf("%s\n %d", e.fname.c_str());
-    }
-    */
-    const unsigned char *start = mmap;
+
+    File unpack_file(tmpfile());
     for(uint64_t j=0; j<num_entries; j++) {
         auto &e = entries[j];
         auto offset = entry_offsets[j];
@@ -160,23 +167,31 @@ void unpack(const char *fname, std::string outdir) {
         printf("%s\n", e.fname.c_str());
         if(is_dir(e)) {
             mkdir(ofname.c_str(), S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
-        } else {
-            lzma_to_file(start + offset, e.compressed_size, File(ofname, "wb"));
+            continue;
         }
+        if(offset != NO_OFFSET) {
+            // Wasteful, writes to temp file. Should be able to write directly to
+            // outfile instead.
+            auto block_end = get_block_end(entry_offsets, j, index_offset); // Assumes index immediately follows data.
+            unpack_file.clear();
+            lzma_to_file(mmap + offset, block_end - offset, unpack_file.get());
+            unpack_file.flush();
+            unpack_file.seek(0, SEEK_SET);
+//            printf("Created temp file of size %d.\n", (int)unpack_file.size());
+        } else {
+//            printf("Continuing with existing unpackfile.\n");
+        }
+        File ofile(ofname, "wb");
+        ofile.copy_from(unpack_file, e.uncompressed_size);
         // FIXME restore metadata here.
     }
 }
 
 int main(int argc, char **argv) {
-#if 1
-    printf("Sorry, too lazy to code clump depacker. Sorry.\n");
-    return 1;
-#else
     if(argc != 3) {
         printf("%s <archive> <outdir>\n", argv[0]);
         return 1;
     }
     unpack(argv[1], argv[2]);
     return 0;
-#endif
 }

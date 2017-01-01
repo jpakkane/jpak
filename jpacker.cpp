@@ -111,21 +111,25 @@ void jpack(const char *ofname, const std::vector<fileinfo> &entries) {
     uint64_t stored_data = 0;
     File gather_file(tmpfile());
     // Bigger blocks improve compression but makes accessing single entries slower.
-    const uint64_t block_size = 100*1024*1024;
-
+    const uint64_t block_size = 1024*1024;
+    bool first_file_written = false;
     for(auto &e : entries) {
-        uint64_t cur_offset = (uint64_t)-1;
+        uint64_t cur_offset = NO_OFFSET;
         if(is_dir(e)) {
-            entry_offsets.push_back((uint64_t)-1);
+            entry_offsets.push_back(NO_OFFSET);
             continue;
         }
         // Compress data if there is more of it than the specified clump size.
-        if(stored_data >= block_size) {
-            auto tmpfile = compress_lzma(gather_file.mmap());
-            ofile.append(tmpfile);
-            gather_file.clear();
-            stored_data = 0;
+        if(stored_data >= block_size || !first_file_written) {
+            if(!first_file_written) {
+                auto tmpfile = compress_lzma(gather_file.mmap());
+                ofile.append(tmpfile);
+                gather_file.clear();
+                printf("Starting new tmpfile.\n");
+                stored_data = 0;
+            }
             cur_offset = ofile.tell();
+            first_file_written = true;
         }
         File ifile(e.fname, "r");
         gather_file.append(ifile);

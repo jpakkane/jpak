@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Jussi Pakkanen.
+ * Copyright (C) 2016-2017 Jussi Pakkanen.
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of version 3, or (at your option) any later version,
@@ -21,6 +21,8 @@
 #include<endian.h>
 #include<sys/stat.h>
 #include<unistd.h>
+#include<memory>
+#include<algorithm>
 
 File::File(const std::string &fname, const char *mode) {
     f = fopen(fname.c_str(), mode);
@@ -201,4 +203,16 @@ void File::append(const File &source) {
 void File::clear() {
     seek(0, SEEK_SET);
     ftruncate(fileno(), 0);
+}
+
+void File::copy_from(File &source, uint64_t num_bytes) {
+    const uint64_t block_size=1024*1024;
+    std::unique_ptr<unsigned char[]> buf(new unsigned char [block_size]);
+    uint64_t copied=0;
+    while(copied < num_bytes) {
+        auto current_block_size = std::min(num_bytes-copied, block_size);
+        source.read(buf.get(), current_block_size);
+        write(buf.get(), current_block_size);
+        copied += current_block_size;
+    }
 }

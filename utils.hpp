@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Jussi Pakkanen.
+ * Copyright (C) 2016-2017 Jussi Pakkanen.
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of version 3, or (at your option) any later version,
@@ -16,5 +16,9 @@
  */
 
 #pragma once
+
+#include<cstdint>
+
+const uint64_t NO_OFFSET = (uint64_t)-1;
 
 void throw_system(const char *msg);

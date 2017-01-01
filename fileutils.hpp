@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Jussi Pakkanen.
+ * Copyright (C) 2016-2017 Jussi Pakkanen.
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of version 3, or (at your option) any later version,
@@ -23,7 +23,6 @@
 
 struct fileinfo {
     uint64_t uncompressed_size;
-    uint64_t compressed_size = 0;
     uint64_t mode;
     uint32_t uid;
     uint32_t gid;

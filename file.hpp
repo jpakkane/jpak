@@ -74,4 +74,5 @@ public:
 
     void append(const File &source);
     void clear();
+    void copy_from(File &source, uint64_t num_bytes);
 };
