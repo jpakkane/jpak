@@ -20,6 +20,7 @@
 #include<utils.hpp>
 #include<endian.h>
 #include<sys/stat.h>
+#include<unistd.h>
 
 File::File(const std::string &fname, const char *mode) {
     f = fopen(fname.c_str(), mode);
@@ -197,3 +198,7 @@ void File::append(const File &source) {
     write(m, m.size());
 }
 
+void File::clear() {
+    seek(0, SEEK_SET);
+    ftruncate(fileno(), 0);
+}

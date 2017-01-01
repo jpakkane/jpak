@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Jussi Pakkanen.
+ * Copyright (C) 2016-2017 Jussi Pakkanen.
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of version 3, or (at your option) any later version,
@@ -168,10 +168,15 @@ void unpack(const char *fname, std::string outdir) {
 }
 
 int main(int argc, char **argv) {
+#if 1
+    printf("Sorry, too lazy to code clump depacker. Sorry.\n");
+    return 1;
+#else
     if(argc != 3) {
         printf("%s <archive> <outdir>\n", argv[0]);
         return 1;
     }
     unpack(argv[1], argv[2]);
     return 0;
+#endif
 }

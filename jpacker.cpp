@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Jussi Pakkanen.
+ * Copyright (C) 2016-2017 Jussi Pakkanen.
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of version 3, or (at your option) any later version,
@@ -101,21 +101,40 @@ File compress_lzma(MMapper buf) {
 }
 
 
-void jpack(const char *ofname, std::vector<fileinfo> &entries) {
+void jpack(const char *ofname, const std::vector<fileinfo> &entries) {
     File ofile(ofname, "wb");
     ofile.write("JPAK0", 4);
     std::vector<uint64_t> entry_offsets;
     entry_offsets.reserve(entries.size());
+    // The proper way is to make lzma compressor a class that can be fed multiple files.
+    // This copies data over, but meh.
+    uint64_t stored_data = 0;
+    File gather_file(tmpfile());
+    // Bigger blocks improve compression but makes accessing single entries slower.
+    const uint64_t block_size = 100*1024*1024;
+
     for(auto &e : entries) {
-        entry_offsets.push_back(ofile.tell());
+        uint64_t cur_offset = (uint64_t)-1;
         if(is_dir(e)) {
+            entry_offsets.push_back((uint64_t)-1);
             continue;
         }
+        // Compress data if there is more of it than the specified clump size.
+        if(stored_data >= block_size) {
+            auto tmpfile = compress_lzma(gather_file.mmap());
+            ofile.append(tmpfile);
+            gather_file.clear();
+            stored_data = 0;
+            cur_offset = ofile.tell();
+        }
         File ifile(e.fname, "r");
-        auto tmpfile = compress_lzma(ifile.mmap());
-        e.compressed_size = tmpfile.size();
+        gather_file.append(ifile);
+        stored_data += ifile.size();
+        entry_offsets.push_back(cur_offset);
+    }
+    if(stored_data > 0) {
+        auto tmpfile = compress_lzma(gather_file.mmap());
         ofile.append(tmpfile);
-        // FIXME, store compressed size.
     }
     assert(entry_offsets.size() == entries.size());
     uint64_t index_offset = ofile.tell();
@@ -123,9 +142,6 @@ void jpack(const char *ofname, std::vector<fileinfo> &entries) {
     // Now dump metadata one column at a time for maximal compression.
     for(const auto &e : entries) {
         index.write64le(e.uncompressed_size);
-    }
-    for(const auto &e : entries) {
-        index.write64le(e.compressed_size);
     }
     for(const auto &e : entries) {
         index.write64le(e.mode);

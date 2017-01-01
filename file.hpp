@@ -73,4 +73,5 @@ public:
     void write(const char *s, uint64_t size) { write((const unsigned char*)s, size); }
 
     void append(const File &source);
+    void clear();
 };

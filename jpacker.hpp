@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Jussi Pakkanen.
+ * Copyright (C) 2016-2017 Jussi Pakkanen.
  *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of version 3, or (at your option) any later version,
@@ -19,4 +19,4 @@
 
 #include<fileutils.hpp>
 
-void jpack(const char *ofname, std::vector<fileinfo> &entries);
+void jpack(const char *ofname, const std::vector<fileinfo> &entries);
