@@ -20,12 +20,14 @@
 #include<cstdio>
 
 int main(int argc, char **argv) {
-    if(argc != 3) {
-        printf("%s [jpack file] [dir to package].\n", argv[0]);
+    if(argc < 3) {
+        printf("%s [jpack file] [files to package].\n", argv[0]);
         return 1;
     }
     std::vector<std::string> originals;
-    originals.push_back(argv[2]);
+    for(int i=2; i<argc; i++) {
+        originals.push_back(argv[i]);
+    }
     auto entries = expand_files(originals);
     /*
     for(const auto &i : entries) {
