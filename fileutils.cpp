@@ -127,6 +127,9 @@ std::vector<fileinfo> expand_dir(const std::string &dirname) {
 std::vector<fileinfo> expand_entry(const std::string &fname) {
     auto fi = get_unix_stats(fname);
     std::vector<fileinfo> result{fi};
+    if(is_symlink(fi)) {
+        return std::vector<fileinfo>{};
+    }
     if(is_dir(fi)) {
         auto new_ones = expand_dir(fname);
         std::move(new_ones.begin(), new_ones.end(), std::back_inserter(result));
@@ -146,6 +149,10 @@ std::vector<fileinfo> expand_files(const std::vector<std::string> &originals) {
         std::move(n.begin(), n.end(), std::back_inserter(res));
         return res;
     });
+}
+
+bool is_symlink(const fileinfo &f) {
+    return S_ISLNK(f.mode);
 }
 
 bool is_dir(const fileinfo &f) {
