@@ -29,6 +29,7 @@ int main(int argc, char **argv) {
         originals.push_back(argv[i]);
     }
     auto entries = expand_files(originals);
+    reorder_entries(entries);
     /*
     for(const auto &i : entries) {
         printf("%s\n", i.fname.c_str());

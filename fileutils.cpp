@@ -141,6 +141,24 @@ std::vector<fileinfo> expand_entry(const std::string &fname) {
     return std::vector<fileinfo>{};
 }
 
+std::string get_extension(const std::string &fname) {
+    auto slashpos = fname.rfind('/');
+    if(slashpos == std::string::npos) {
+        slashpos = 0;
+    }
+    auto dotpos = fname.find('.', slashpos);
+    if(dotpos == std::string::npos) {
+        return "";
+    }
+    return fname.substr(dotpos+1, std::string::npos);
+}
+
+bool extension_order(const fileinfo &f1, const fileinfo &f2) {
+    auto e1 = get_extension(f1.fname);
+    auto e2 = get_extension(f2.fname);
+    return e1 < e2;
+}
+
 }
 
 std::vector<fileinfo> expand_files(const std::vector<std::string> &originals) {
@@ -161,4 +179,12 @@ bool is_dir(const fileinfo &f) {
 
 bool is_file(const fileinfo &f) {
     return S_ISREG(f.mode);
+}
+
+void reorder_entries(std::vector<fileinfo> entries) {
+    auto file_start = std::partition(entries.begin(), entries.end(), is_dir);
+    std::sort(file_start, entries.end(), [](const fileinfo &f1, const fileinfo &f2) {
+        return f1.uncompressed_size < f2.uncompressed_size;
+    });
+    std::stable_sort(file_start, entries.end(), extension_order);
 }

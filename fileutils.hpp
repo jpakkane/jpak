@@ -34,6 +34,12 @@ struct fileinfo {
 
 std::vector<fileinfo> expand_files(const std::vector<std::string> &originals);
 
+/*
+ * Reorder entries to maximize compression. That is, put file of similar
+ * type and size next to each other.
+ */
+void reorder_entries(std::vector<fileinfo> entries);
+
 bool is_symlink(const fileinfo &f);
 bool is_dir(const fileinfo &f);
 bool is_file(const fileinfo &f);
